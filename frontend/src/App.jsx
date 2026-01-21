@@ -1,45 +1,135 @@
 import { useState } from "react";
 
 export default function App() {
-  const [prompt, setPrompt] = useState("");
-  const [files, setFiles] = useState(null);
+  const [messages, setMessages] = useState([
+    { role: "assistant", content: "Hi 👋 What do you want to build today?" }
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const generate = async () => {
-    const res = await fetch("http://localhost:8000/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
 
-    const data = await res.json();
-    setFiles(data.files);
+    const userPrompt = input;
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: userPrompt },
+      { role: "assistant", content: "Thinking..." }
+    ]);
+
+    setInput("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("http://localhost:8000/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userPrompt })
+      });
+
+      const data = await res.json();
+
+      setMessages((prev) => [
+        ...prev.slice(0, -1), // remove "Thinking..."
+        {
+          role: "assistant",
+          content: "✅ App generated successfully!"
+        },
+        {
+          role: "assistant",
+          files: data.files
+        }
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { role: "assistant", content: "❌ Something went wrong." }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>AI App Builder</h2>
+    <div className="h-screen flex bg-gray-100">
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r hidden md:flex flex-col">
+        <div className="p-4 font-bold text-xl">APP BUILDER</div>
+        <button className="m-4 p-2 rounded bg-black text-white">
+          + New Chat
+        </button>
+        <div className="flex-1 overflow-auto px-4 text-sm text-gray-500">
+          No conversations yet
+        </div>
+      </aside>
 
-      <textarea
-        rows={5}
-        style={{ width: "100%" }}
-        placeholder="Describe your app..."
-        value={prompt}
-        onChange={e => setPrompt(e.target.value)}
-      />
+      {/* Chat Area */}
+      <main className="flex-1 flex flex-col w-[calc(100vw-256px)]">
+        {/* Header */}
+        <header className="h-14 bg-white border-b flex items-center px-4 font-semibold">
+          AI App Builder
+        </header>
 
-      <button onClick={generate}>Generate</button>
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.map((msg, i) => (
+            <div key={i}>
+              {msg.content && (
+                <div
+                  className={`max-w-xl px-4 py-3 rounded-2xl text-sm shadow-sm ${
+                    msg.role === "user"
+                      ? "ml-auto bg-black text-white"
+                      : "bg-white text-gray-800"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              )}
 
-      {files && (
-        <div>
-          <h3>Generated Files</h3>
-          {Object.keys(files).map(f => (
-            <pre key={f}>
-              <strong>{f}</strong>
-              <code>{files[f]}</code>
-            </pre>
+              {/* Render generated files */}
+              {msg.files && (
+                <div className="bg-white border rounded-xl p-4 max-w-3xl space-y-4">
+                  <h3 className="font-semibold text-sm text-gray-700">
+                    Generated Files
+                  </h3>
+
+                  {Object.entries(msg.files).map(([filename, code]) => (
+                    <div key={filename}>
+                      <div className="text-xs font-mono text-gray-600 mb-1">
+                        {filename}
+                      </div>
+                      <pre className="bg-gray-900 text-gray-100 text-xs p-3 rounded-lg overflow-x-auto">
+                        <code>{code}</code>
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
-      )}
+
+        {/* Input */}
+        <div className="border-t bg-white p-4">
+          <div className="flex items-center gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Describe your app..."
+              className="flex-1 border rounded-xl px-4 py-2 focus:outline-none"
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading}
+              className="p-2 rounded-xl bg-black text-white disabled:opacity-50"
+            >
+              send
+            </button>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

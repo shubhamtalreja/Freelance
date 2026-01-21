@@ -6,7 +6,8 @@ load_dotenv()
 
 llm = ChatOpenAI(
     model="gpt-4o-mini",
-    temperature=0
+    temperature=0,
+    max_tokens=1200,
 )
 
 with open("prompts/react_app.txt", encoding="utf-8") as f:
